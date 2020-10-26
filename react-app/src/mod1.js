@@ -194,7 +194,7 @@ export default function Mod1() {
 			<button onClick={() => setIteration(iteration+1)} style={{position: 'absolute', zIndex: 10000}} type="button">Iteration!</button>
 			<button onClick={() => console.log(map)} style={{position: 'absolute', zIndex: 10000, marginLeft: -50}} type="button">Map!</button>
 			<Canvas colorManagement>
-				<ambientLight intensity={0.5} color="#fff"/>
+				<ambientLight intensity={0.45} color="#fff"/>
 
 				<Waters iteration={iteration}/>
 				<Grounds/>
