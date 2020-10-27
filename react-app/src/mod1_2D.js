@@ -5,15 +5,12 @@ import { Canvas } 																			from 'react-three-fiber'
 import * as THREE 																			from "three"
 import { Stars, TrackballControls }											from "drei"
 
-const mapSize = 25
+const mapSize = 14
 let map = []
-for (let x = 0; x < mapSize; x++) {
-	map[x] = []
+for (let i = 0; i < mapSize; i++) {
+	map[i] = []
 	for (let y = 0; y < mapSize; y++) {
-		map[x][y] = []
-		for (let z = 0; z < mapSize; z++) {
-			map[x][y][z] = 'e'
-		}
+		map[i][y] = 'e'
 	}
 }
 
@@ -23,108 +20,79 @@ function rand(max) {
 
 function MoveWater(iteration, meshes) {
 	//iterate through water to move
-	//console.time('Move Water')
+	console.time('Move Water')
 	for (const waterUnit of meshes.children) {
-		const xPos = Number(waterUnit.position.x)
-		const yPos = Number(waterUnit.position.y)
-		const zPos = Number(waterUnit.position.z)
-
-		let goDown = 0
-		let goLeft = 0
-		let goRight = 0
-		let goFront = 0
-		let goBack = 0
+		let xPos = Number(waterUnit.position.x)
+		let yPos = Number(waterUnit.position.y)
+		let isBOk = 0 // down
+		let isROk = 0 // right
+		let isLOk = 0 // left
 		let moveTo = []
 
-		if (map[xPos]?.[yPos-1]?.[zPos] === 'e') { // check if bottom is clear
-			goDown = 1
-		} else if (map[xPos]?.[yPos+1]?.[zPos] === 'water') { // check if water on top
-			if (map[xPos+1]?.[yPos]?.[zPos] === 'e') { // check if right is clear
-				goRight = 1
-			} else if (map[xPos-1]?.[yPos]?.[zPos] === 'e') { // check if left is clear
-				goLeft = 1
-			} else if (map[xPos]?.[yPos]?.[zPos+1] === 'e') { // check if front is clear
-				goFront = 1
-			} else if (map[xPos]?.[yPos]?.[zPos-1] === 'e') { // check if back is clear
-				goBack = 1
+		if (map[xPos][yPos-1] === 'e') { // check if bottom is clear
+			isBOk = 1
+		} else if (map[xPos][yPos+1] === 'water') { // check if above is water tile
+			if (map[xPos+1]?.[yPos] === 'e') { // check if right is clear
+				if (map[xPos-1]?.[yPos] === 'e') { // check if left is also clear
+					if (Math.random() >= 0.5)
+						isROk = 1
+					else
+						isLOk = 1
+				} else {
+					isROk = 1
+				}
 			}
-		} else if (map[xPos]?.[yPos-1]?.[zPos] === 'water' || map[xPos]?.[yPos-1]?.[zPos] === 'ground') {// try to slide
+			else if (map[xPos-1]?.[yPos] === 'e') { // check if left is clear
+				isLOk = 1
+			}
+		} else if (map[xPos][yPos-1] === 'water' || map[xPos][yPos-1] === 'ground') {// try to slide
 			let continueRight = true
 			let continueLeft = true
-			let continueFront = true
-			let continueBack = true
 			let positionFound = false
 			let i = 0
-			while ((continueRight || continueLeft || continueFront || continueBack) && !positionFound) {
+			while ((continueRight || continueLeft) && !positionFound) {
 				++i
-				if (map[xPos+i]?.[yPos]?.[zPos] === 'e') {
-					if (map[xPos+i]?.[yPos-1]?.[zPos] === 'e') {
-						moveTo = [xPos+i, yPos-1, zPos]
+				if (map[xPos+i]?.[yPos] === 'e') {
+					if (map[xPos+i]?.[yPos-1] === 'e') {
+						moveTo = [xPos+i, yPos-1]
 						positionFound = true
 					}
 				} else {
 					continueRight = false
 				}
-				if (map[xPos-i]?.[yPos]?.[zPos] === 'e') {
-					if (map[xPos-i]?.[yPos-1]?.[zPos] === 'e') {
-						moveTo = [xPos-i, yPos-1, zPos]
+				if (map[xPos-i]?.[yPos] === 'e') {
+					if (map[xPos-i]?.[yPos-1] === 'e') {
+						if (positionFound && Math.random() >= 0.5) {
+							moveTo = [xPos-i, yPos-1]
+						} else {
+							moveTo = [xPos-i, yPos-1]
+						}
 						positionFound = true
 					}
 				} else {
 					continueLeft = false
 				}
-				if (map[xPos]?.[yPos]?.[zPos+i] === 'e') {
-					if (map[xPos]?.[yPos-1]?.[zPos+i] === 'e') {
-						moveTo = [xPos, yPos-1, zPos+i]
-						positionFound = true
-					}
-				} else {
-					continueFront = false
-				}
-				if (map[xPos]?.[yPos]?.[zPos-i] === 'e') {
-					if (map[xPos]?.[yPos-1]?.[zPos-i] === 'e') {
-						moveTo = [xPos, yPos-1, zPos-i]
-						positionFound = true
-					}
-				} else {
-					continueBack = false
-				}
 			}
 		}
-
-
-
-
-
-		if (goDown) {
-			if (yPos - goDown < 0) // Protect from having invalid value
-				continue;
-			map[xPos][yPos][zPos] = 'e'
-			waterUnit.position.x = xPos
-			waterUnit.position.y = yPos - goDown
-			waterUnit.position.z = zPos
-			map[waterUnit.position.x][waterUnit.position.y][waterUnit.position.z] = 'water'
-		}
-		if (goLeft || goRight || goBack || goFront) {
-			if (xPos - goLeft < 0 || xPos + goRight > mapSize-1) // Protect from having invalid value
-				continue;
-			if (zPos - goBack < 0 || zPos + goFront > mapSize-1) // Protect from having invalid value
-				continue;
-				map[xPos][yPos][zPos] = 'e'
-				waterUnit.position.x = xPos + goRight - goLeft
-				waterUnit.position.y = yPos
-				waterUnit.position.z = zPos + goFront - goBack
-				map[waterUnit.position.x][waterUnit.position.y][waterUnit.position.z] = 'water'
-		}
-		if (moveTo.length === 3) {
-			map[xPos][yPos][zPos] = 'e'
+		
+		if (isBOk || isROk || isLOk) {
+			if (xPos - isLOk + isROk > mapSize-1 || xPos + isROk < 0 || // check if x is not out of map
+				yPos - isBOk < 0 ) { // check if y is not out of map 
+				
+			} else {
+				map[xPos][yPos] = 'e'
+				waterUnit.position.x = xPos-isLOk+isROk
+				waterUnit.position.y = yPos-isBOk
+				map[waterUnit.position.x][waterUnit.position.y] = 'water'
+			}
+		} else if (moveTo.length === 2) {
+			map[xPos][yPos] = 'e'
 			waterUnit.position.x = moveTo[0]
 			waterUnit.position.y = moveTo[1]
-			waterUnit.position.z = moveTo[2]
-			map[waterUnit.position.x][waterUnit.position.y][waterUnit.position.z] = 'water'
+			map[waterUnit.position.x][waterUnit.position.y] = 'water'
 		}
 	}
-	//console.timeEnd('Move Water')
+	console.timeEnd('Move Water')
 }
 
 function Waters(props) {
@@ -136,10 +104,8 @@ function Waters(props) {
 		const initTiles = []
 		for (const x in map) {
 			for (const y in map[x]) {
-				for (const z in map[x][y]) {
-					if (map[x][y][z] === 'water')
-						initTiles.push({x: x, y: y, z: z})
-				}
+				if (map[x][y] === 'water')
+					initTiles.push({x: x, y: y})
 			}
 		}
 		setTiles(initTiles)
@@ -164,7 +130,7 @@ function Waters(props) {
 		<mesh ref={meshes}>
 			{Object.keys(tiles).map((k, i) => (
 				<mesh
-					position={[tiles[k].x, tiles[k].y, tiles[k].z]}
+					position={[tiles[k].x, tiles[k].y, 0]}
 					key={i}
 				>
 					<boxBufferGeometry attach="geometry" args={[1, 1, 1]} />
@@ -182,10 +148,8 @@ function Grounds(props) {
 		const initTiles = []
 		for (const x in map) {
 			for (const y in map[x]) {
-				for (const z in map[x][y]) {
-					if (map[x][y][z] === 'ground')
-						initTiles.push({x: x, y: y, z: z})
-				}
+				if (map[x][y] === 'ground')
+					initTiles.push({x: x, y: y})
 			}
 		}
 		setTiles(initTiles)
@@ -195,7 +159,7 @@ function Grounds(props) {
 		<mesh>
 			{Object.keys(tiles).map((k, i) => (
 				<mesh
-				position={[tiles[k].x, tiles[k].y, tiles[k].z]}
+					position={[tiles[k].x, tiles[k].y, 0]}
 					key={i}
 				>
 					<boxBufferGeometry attach="geometry" args={[1, 1, 1]} />
@@ -235,52 +199,50 @@ export default function Mod1() {
 	const [totalGround, setTotalGround] = useState(0)
 	
 	useEffect(() => {
-	
+		// 2D nice map
 		/*
-		// fill with grounds
-		let expectedGround = (mapSize*mapSize)
-		while (expectedGround-- > 0) {
-			const x = rand(mapSize-1)
-			const y = rand(mapSize-1)
-			const z = rand(mapSize-1)
-			if (y < mapSize - mapSize/2)
-				map[x][y][z] = 'ground'
+		let i = mapSize-1
+		while (i >= 0) {
+			let k = mapSize-1
+			while (k >= 12) {
+				map[i][k] = 'water'
+				--k
+			}
+			--i
 		}
+		i = mapSize-1
+		while (i >= 2) {
+			map[i][11] = 'ground'
+			--i
+		}
+		i = mapSize-3
+		while (i >= 0) {
+			map[i][5] = 'ground'
+			--i
+		}
+		map[0][6] = 'ground'
+		map[1][7] = 'ground'
+		map[2][6] = 'ground'
+
+		map[4][6] = 'ground'
+		map[5][7] = 'ground'
+		map[6][6] = 'ground'
+
+		map[10][6] = 'ground'
+		map[11][7] = 'ground'
+		map[12][8] = 'ground'
 		*/
 
-		let xg = mapSize-2
-		while (xg > 0) {
-			let zg = mapSize-2
-			while (zg > 0) {
-				map[xg][Math.floor(mapSize/2)-2][zg] = 'ground'
-				--zg
-			}
-			--xg
+		// 2d random fill
+		// fill with grounds
+		let expectedGround = (mapSize*mapSize)/12
+		while (expectedGround-- > 0) {
+			map[rand(mapSize-1)][rand(mapSize-1)] = 'ground'
 		}
-		
-		xg = mapSize-1
-		while (xg >= 0) {
-			let zg = mapSize-1
-			while (zg >= 0) {
-				map[xg][Math.floor(mapSize/2)-5][zg] = 'ground'
-				--zg
-			}
-			--xg
-		}
-		map[12][Math.floor(mapSize/2)-5][12] = 'e'
-		map[12][Math.floor(mapSize/2)-5][11] = 'e'
-		map[11][Math.floor(mapSize/2)-5][12] = 'e'
-		map[11][Math.floor(mapSize/2)-5][11] = 'e'
-		
-
 		// fill with water
-		let expectedWater = (mapSize*mapSize)*5
+		let expectedWater = (mapSize*mapSize)/3
 		while (expectedWater-- > 0) {
-			const x = rand(mapSize-1)
-			const y = rand(mapSize-1)
-			const z = rand(mapSize-1)
-			if (y > mapSize - mapSize/2)
-				map[x][y][z] = 'water'
+			map[rand(mapSize-1)][rand(mapSize-1)] = 'water'
 		}
 
 		// count tiles
@@ -288,12 +250,10 @@ export default function Mod1() {
 		let ground = 0
 		for (const x of map) {
 			for (const y of x) {
-				for (const z of y) {
-					if (z === 'water')
-						water++
-					else if (z === 'ground')
-						ground++
-				}
+				if (y === 'water')
+					water++
+				else if (y === 'ground')
+					ground++
 			}
 		}
 		setTotalWater(water)
@@ -313,9 +273,6 @@ export default function Mod1() {
 
 				<Waters iteration={iteration}/>
 				<Grounds/>
-				{/*
-				*/}
-				
 
 				<Plane />
 				<SimulationLimit />
