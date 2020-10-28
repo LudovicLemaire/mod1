@@ -7,7 +7,7 @@ import { Stars, TrackballControls }											from "drei"
 
 import slopezMap from "./map.json"
 
-const mapSize = 25
+const mapSize = 7
 let map = []
 for (let x = 0; x < mapSize; x++) {
 	map[x] = []
@@ -134,7 +134,7 @@ function Waters(props) {
 	const meshes = useRef()
 	const boxTemplate = useRef()
 	const [tiles, setTiles] = useState([])
-	const { iteration, raining, waving } = props
+	const { iteration, raining, waving, eruption } = props
 
 	useEffect(() => {
 		const initTiles = []
@@ -203,10 +203,30 @@ function Waters(props) {
 					}
 					++y
 				}
-
-				
-				
 			}
+
+			if (eruption) {
+				let spawnPoints = [[15, 0, 12], [3, 0, 12]]
+				for (const p of spawnPoints) {
+					while (1) {
+						if (map[p[0]]?.[p[1]]?.[p[2]] === 'water' || map[p[0]]?.[p[1]]?.[p[2]] === 'ground') {
+							p[1]++
+						} else if (map[p[0]]?.[p[1]]?.[p[2]] === 'e') {
+							let newTile = boxTemplate.current.clone()
+							newTile.visible = true
+							newTile.material.transparent = true
+							newTile.material.opacity = 0.5
+							newTile.position.set(p[0], p[1], p[2])
+							meshes.current.children.push(newTile)
+							map[p[0]][p[1]][p[2]] = 'water'
+							break;
+						} else {
+							break;
+						}
+					}
+				}
+			}
+
 			timeElapsed = 0
 		}
 	})
@@ -288,6 +308,7 @@ export default function Mod1() {
 	const [iteration, setIteration] = useState(false)
 	const [raining, setRaining] = useState(0)
 	const [waving, setWaving] = useState(0)
+	const [eruption, setEruption] = useState(0)
 	const [totalWater, setTotalWater] = useState(0)
 	const [totalGround, setTotalGround] = useState(0)
 	
@@ -339,16 +360,37 @@ export default function Mod1() {
 		}
 		*/
 
+		/*
 		// fill synlo map
 		for (const x in slopezMap) {
 			for (const y in slopezMap[x]) {
 				for (const z in slopezMap[x][y]) {
 					if (slopezMap[x][y][z] === 1)
-						map[x][z][y] = 'ground'
+						if (x < mapSize && y < mapSize && z < mapSize)
+							map[x][z][y] = 'ground'
 				}
 			}
-
 		}
+		*/
+		let copyMap = JSON.parse(JSON.stringify(map))
+		copyMap[0][0][0] = 'ground'
+		copyMap[0][2][0] = 'ground'
+		copyMap[2][2][2] = 'ground'
+		copyMap[0][4][0] = 'ground'
+		copyMap[4][4][0] = 'ground'
+		copyMap[0][4][4] = 'ground'
+		
+		let map2 = []
+		for (let x = 0; x < mapSize; x++) {
+			map2[x] = []
+			for (let z = 0; z < mapSize; z++) {
+				map2[x][z] = copyMap[x][4][z]
+				if (copyMap[x][4][z] === 'ground')
+					map[x][4][z] = 'ground'
+			}
+		}
+		console.log('testing', map2)
+
 		// count tiles
 		let water = 0
 		let ground = 0
@@ -364,7 +406,7 @@ export default function Mod1() {
 		}
 		setTotalWater(water)
 		setTotalGround(ground)
-		console.log('map', map)
+		//console.log('map', map)
 	}, [])
 	
 	
@@ -373,13 +415,15 @@ export default function Mod1() {
 			<button onClick={() => setIteration(!iteration)} style={{position: 'absolute', zIndex: 10000}} type="button">Iteration!</button>
 			<button onClick={() => setRaining(!raining)} style={{position: 'absolute', zIndex: 10000, marginLeft: 72}} type="button">Raining!</button>
 			<button onClick={() => setWaving(!waving)} style={{position: 'absolute', zIndex: 10000, marginLeft: 142}} type="button">Waving!</button>
+			<button onClick={() => setEruption(!eruption)} style={{position: 'absolute', zIndex: 10000, marginLeft: 212}} type="button">Eruption!</button>
 			<button onClick={() => console.log(map)} style={{position: 'absolute', zIndex: 10000, marginLeft: -50}} type="button">Map!</button>
 			<p style={{color: '#409EFF', position: 'absolute', zIndex: 10000, right: 5, marginTop: -2, fontSize: 17}}>{totalWater}</p>
 			<p style={{color: '#67C23A', position: 'absolute', zIndex: 10000, right: 5, marginTop: 20, fontSize: 17}}>{totalGround}</p>
 			<Canvas colorManagement>
 				<pointLight intensity={0.45} distance={mapSize*2} color="#fff" position={[Math.floor(mapSize/2), mapSize+5, Math.floor(mapSize/2)]}/>
+				<pointLight intensity={0.45} distance={mapSize*2} color="#fff" position={[Math.floor(mapSize/2), Math.floor(mapSize/2), Math.floor(mapSize/2)]}/>
 				
-				<Waters iteration={iteration} raining={raining} waving={waving}/>
+				<Waters iteration={iteration} raining={raining} waving={waving} eruption={eruption}/>
 				<Grounds/>
 				{/*
 				*/}
