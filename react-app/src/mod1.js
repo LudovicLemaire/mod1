@@ -1,13 +1,13 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useRef, useEffect, useState, useMemo } 	from 'react'
-import { Canvas } 																			from 'react-three-fiber'
+import { Canvas, useFrame } 																			from 'react-three-fiber'
 // eslint-disable-next-line
 import * as THREE 																			from "three"
 import { Stars, TrackballControls }											from "drei"
 
 import slopezMap from "./map.json"
 
-const mapSize = 50
+const mapSize = 25
 let map = []
 for (let x = 0; x < mapSize; x++) {
 	map[x] = []
@@ -23,7 +23,7 @@ function rand(max) {
 	return Math.floor(Math.random()*(max+1))
 }
 
-function MoveWater(iteration, meshes) {
+function MoveWater(meshes) {
 	//iterate through water to move
 	//console.time('Move Water')
 	for (const waterUnit of meshes.children) {
@@ -59,7 +59,7 @@ function MoveWater(iteration, meshes) {
 			let i = 0
 			while ((continueRight || continueLeft || continueFront || continueBack) && !positionFound) {
 				++i
-				if (map[xPos+i]?.[yPos]?.[zPos] === 'e') {
+				if (map[xPos+i]?.[yPos]?.[zPos] === 'e' && continueRight) {
 					if (map[xPos+i]?.[yPos-1]?.[zPos] === 'e') {
 						moveTo = [xPos+i, yPos-1, zPos]
 						positionFound = true
@@ -67,7 +67,7 @@ function MoveWater(iteration, meshes) {
 				} else {
 					continueRight = false
 				}
-				if (map[xPos-i]?.[yPos]?.[zPos] === 'e') {
+				if (map[xPos-i]?.[yPos]?.[zPos] === 'e' && continueLeft) {
 					if (map[xPos-i]?.[yPos-1]?.[zPos] === 'e') {
 						moveTo = [xPos-i, yPos-1, zPos]
 						positionFound = true
@@ -75,7 +75,7 @@ function MoveWater(iteration, meshes) {
 				} else {
 					continueLeft = false
 				}
-				if (map[xPos]?.[yPos]?.[zPos+i] === 'e') {
+				if (map[xPos]?.[yPos]?.[zPos+i] === 'e' && continueFront) {
 					if (map[xPos]?.[yPos-1]?.[zPos+i] === 'e') {
 						moveTo = [xPos, yPos-1, zPos+i]
 						positionFound = true
@@ -83,7 +83,7 @@ function MoveWater(iteration, meshes) {
 				} else {
 					continueFront = false
 				}
-				if (map[xPos]?.[yPos]?.[zPos-i] === 'e') {
+				if (map[xPos]?.[yPos]?.[zPos-i] === 'e' && continueBack) {
 					if (map[xPos]?.[yPos-1]?.[zPos-i] === 'e') {
 						moveTo = [xPos, yPos-1, zPos-i]
 						positionFound = true
@@ -118,23 +118,24 @@ function MoveWater(iteration, meshes) {
 				waterUnit.position.z = zPos + goFront - goBack
 				map[waterUnit.position.x][waterUnit.position.y][waterUnit.position.z] = 'water'
 		}
-		/*
+		
 		if (moveTo.length === 3) {
 			map[xPos][yPos][zPos] = 'e'
 			waterUnit.position.x = moveTo[0]
 			waterUnit.position.y = moveTo[1]
 			waterUnit.position.z = moveTo[2]
 			map[waterUnit.position.x][waterUnit.position.y][waterUnit.position.z] = 'water'
-		}*/
+		}
 	}
 	//console.timeEnd('Move Water')
 }
 
 function Waters(props) {
 	const meshes = useRef()
+	const boxTemplate = useRef()
 	const [tiles, setTiles] = useState([])
-	const { iteration } = props
-	
+	const { iteration, raining, waving } = props
+
 	useEffect(() => {
 		const initTiles = []
 		for (const x in map) {
@@ -156,14 +157,65 @@ function Waters(props) {
 			}
 		}
 	}, [meshes, tiles])
+	
+	let timeElapsed = 0
+	useFrame((e, delta) => {
+		timeElapsed += delta
+		if (timeElapsed > 0.05) {
+			if (iteration) {
+				MoveWater(meshes.current)
+			}
 
-	useEffect(() => {
-		if (iteration > 0) {
-			MoveWater(iteration, meshes.current)
+			if (raining) {
+				let rainingNb = 2
+				while (rainingNb--) {
+					let x = rand(mapSize-1); let y = mapSize-1; let z = rand(mapSize-1);
+					if (map[x][y][z] === 'e') {
+						let newTile = boxTemplate.current.clone()
+						newTile.visible = true
+						newTile.material.transparent = true
+						newTile.material.opacity = 0.5
+						newTile.position.set(x, y, z)
+						meshes.current.children.push(newTile)
+						map[x][y][z] = 'water'
+					}
+				}
+			}
+
+			if (waving) {
+				let x = 0
+				let y = 0
+				let z = 0
+				
+				while (y < mapSize) {
+					x = 0
+					while (x < mapSize) {
+						if (map[x][y][z] === 'e') {
+							let newTile = boxTemplate.current.clone()
+							newTile.visible = true
+							newTile.material.transparent = true
+							newTile.material.opacity = 0.5
+							newTile.position.set(x, y, z)
+							meshes.current.children.push(newTile)
+							map[x][y][z] = 'water'
+						}
+						++x
+					}
+					++y
+				}
+
+				
+				
+			}
+			timeElapsed = 0
 		}
-	}, [iteration])
+	})
 
 	return (<>
+		<mesh ref={boxTemplate} position={[0, 0, 0]} visible={false}>
+			<boxBufferGeometry attach="geometry" args={[1, 1, 1]} />
+			<meshStandardMaterial attach="material" color="#409EFF" />
+		</mesh>
 		<mesh ref={meshes}>
 			{Object.keys(tiles).map((k, i) => (
 				<mesh
@@ -199,7 +251,7 @@ function Grounds(props) {
 			{Object.keys(tiles).map((k, i) => (
 				<mesh
 				position={[tiles[k].x, tiles[k].y, tiles[k].z]}
-					key={i}
+				key={i}
 				>
 					<boxBufferGeometry attach="geometry" args={[1, 1, 1]} />
 					<meshStandardMaterial attach="material" color="#67C23A"/>
@@ -233,18 +285,17 @@ function SimulationLimit() {
 }
 
 export default function Mod1() {
-	const [iteration, setIteration] = useState(0)
+	const [iteration, setIteration] = useState(false)
+	const [raining, setRaining] = useState(0)
+	const [waving, setWaving] = useState(0)
 	const [totalWater, setTotalWater] = useState(0)
 	const [totalGround, setTotalGround] = useState(0)
 	
 	useEffect(() => {
-	
-		for (const x in slopezMap) {
-			for (const y in slopezMap[x]) {
-				map[x][Math.floor(slopezMap[x][y])][y] = 'ground'
-			}
+		
+		
+		
 
-		}
 		/*
 		// fill with grounds
 		let expectedGround = (mapSize*mapSize)
@@ -257,34 +308,8 @@ export default function Mod1() {
 		}
 		*/
 
-		/*
-		// feel great map
-		let xg = mapSize-2
-		while (xg > 0) {
-			let zg = mapSize-2
-			while (zg > 0) {
-				map[xg][Math.floor(mapSize/2)-2][zg] = 'ground'
-				--zg
-			}
-			--xg
-		}
-		
-		xg = mapSize-1
-		while (xg >= 0) {
-			let zg = mapSize-1
-			while (zg >= 0) {
-				map[xg][Math.floor(mapSize/2)-5][zg] = 'ground'
-				--zg
-			}
-			--xg
-		}
-		map[12][Math.floor(mapSize/2)-5][12] = 'e'
-		map[12][Math.floor(mapSize/2)-5][11] = 'e'
-		map[11][Math.floor(mapSize/2)-5][12] = 'e'
-		map[11][Math.floor(mapSize/2)-5][11] = 'e'
-		*/
-
 		// fill with water
+		/*
 		let expectedWater = (mapSize*mapSize)*5
 		while (expectedWater-- > 0) {
 			const x = rand(mapSize-1)
@@ -293,7 +318,37 @@ export default function Mod1() {
 			if (y > mapSize - mapSize/4)
 				map[x][y][z] = 'water'
 		}
+		*/
 
+		/*
+		// wave
+		let x1 = 0
+		let y1 = 0
+		let z1 = 0
+		while (x1 < mapSize/4) {
+			y1 = 0
+			while (y1 < mapSize) {
+				z1 = 0
+				while (z1 < mapSize) {
+					map[x1][y1][z1] = 'water'
+					++z1
+				}
+				++y1
+			}
+			++x1
+		}
+		*/
+
+		// fill synlo map
+		for (const x in slopezMap) {
+			for (const y in slopezMap[x]) {
+				for (const z in slopezMap[x][y]) {
+					if (slopezMap[x][y][z] === 1)
+						map[x][z][y] = 'ground'
+				}
+			}
+
+		}
 		// count tiles
 		let water = 0
 		let ground = 0
@@ -315,14 +370,16 @@ export default function Mod1() {
 	
 	return (
 		<div style={{width: '100%', height: window.innerHeight}} >
-			<button onClick={() => setIteration(iteration+1)} style={{position: 'absolute', zIndex: 10000}} type="button">Iteration!</button>
+			<button onClick={() => setIteration(!iteration)} style={{position: 'absolute', zIndex: 10000}} type="button">Iteration!</button>
+			<button onClick={() => setRaining(!raining)} style={{position: 'absolute', zIndex: 10000, marginLeft: 72}} type="button">Raining!</button>
+			<button onClick={() => setWaving(!waving)} style={{position: 'absolute', zIndex: 10000, marginLeft: 142}} type="button">Waving!</button>
 			<button onClick={() => console.log(map)} style={{position: 'absolute', zIndex: 10000, marginLeft: -50}} type="button">Map!</button>
 			<p style={{color: '#409EFF', position: 'absolute', zIndex: 10000, right: 5, marginTop: -2, fontSize: 17}}>{totalWater}</p>
 			<p style={{color: '#67C23A', position: 'absolute', zIndex: 10000, right: 5, marginTop: 20, fontSize: 17}}>{totalGround}</p>
 			<Canvas colorManagement>
-				<ambientLight intensity={0.45} color="#fff"/>
-
-				<Waters iteration={iteration}/>
+				<pointLight intensity={0.45} distance={mapSize*2} color="#fff" position={[Math.floor(mapSize/2), mapSize+5, Math.floor(mapSize/2)]}/>
+				
+				<Waters iteration={iteration} raining={raining} waving={waving}/>
 				<Grounds/>
 				{/*
 				*/}
