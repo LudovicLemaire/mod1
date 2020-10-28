@@ -5,7 +5,9 @@ import { Canvas } 																			from 'react-three-fiber'
 import * as THREE 																			from "three"
 import { Stars, TrackballControls }											from "drei"
 
-const mapSize = 25
+import slopezMap from "./map.json"
+
+const mapSize = 50
 let map = []
 for (let x = 0; x < mapSize; x++) {
 	map[x] = []
@@ -116,13 +118,14 @@ function MoveWater(iteration, meshes) {
 				waterUnit.position.z = zPos + goFront - goBack
 				map[waterUnit.position.x][waterUnit.position.y][waterUnit.position.z] = 'water'
 		}
+		/*
 		if (moveTo.length === 3) {
 			map[xPos][yPos][zPos] = 'e'
 			waterUnit.position.x = moveTo[0]
 			waterUnit.position.y = moveTo[1]
 			waterUnit.position.z = moveTo[2]
 			map[waterUnit.position.x][waterUnit.position.y][waterUnit.position.z] = 'water'
-		}
+		}*/
 	}
 	//console.timeEnd('Move Water')
 }
@@ -236,6 +239,12 @@ export default function Mod1() {
 	
 	useEffect(() => {
 	
+		for (const x in slopezMap) {
+			for (const y in slopezMap[x]) {
+				map[x][Math.floor(slopezMap[x][y])][y] = 'ground'
+			}
+
+		}
 		/*
 		// fill with grounds
 		let expectedGround = (mapSize*mapSize)
@@ -248,6 +257,8 @@ export default function Mod1() {
 		}
 		*/
 
+		/*
+		// feel great map
 		let xg = mapSize-2
 		while (xg > 0) {
 			let zg = mapSize-2
@@ -271,7 +282,7 @@ export default function Mod1() {
 		map[12][Math.floor(mapSize/2)-5][11] = 'e'
 		map[11][Math.floor(mapSize/2)-5][12] = 'e'
 		map[11][Math.floor(mapSize/2)-5][11] = 'e'
-		
+		*/
 
 		// fill with water
 		let expectedWater = (mapSize*mapSize)*5
@@ -279,7 +290,7 @@ export default function Mod1() {
 			const x = rand(mapSize-1)
 			const y = rand(mapSize-1)
 			const z = rand(mapSize-1)
-			if (y > mapSize - mapSize/2)
+			if (y > mapSize - mapSize/4)
 				map[x][y][z] = 'water'
 		}
 
@@ -303,7 +314,7 @@ export default function Mod1() {
 	
 	
 	return (
-		<div style={{width: '100%', height: '754px'}} >
+		<div style={{width: '100%', height: window.innerHeight}} >
 			<button onClick={() => setIteration(iteration+1)} style={{position: 'absolute', zIndex: 10000}} type="button">Iteration!</button>
 			<button onClick={() => console.log(map)} style={{position: 'absolute', zIndex: 10000, marginLeft: -50}} type="button">Map!</button>
 			<p style={{color: '#409EFF', position: 'absolute', zIndex: 10000, right: 5, marginTop: -2, fontSize: 17}}>{totalWater}</p>
