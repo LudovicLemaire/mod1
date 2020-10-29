@@ -1,13 +1,11 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import React, { useRef, useEffect, useState, useMemo } 	from 'react'
-import { Canvas, useFrame } 																			from 'react-three-fiber'
+import React, { useRef, useEffect, useState } 	from 'react'
+import { Canvas } 																			from 'react-three-fiber'
 // eslint-disable-next-line
 import * as THREE 																			from "three"
 import { Stars, TrackballControls }											from "drei"
 
-import slopezMap from "./map.json"
-
-const mapSize = 7
+const mapSize = 25
 let map = []
 for (let x = 0; x < mapSize; x++) {
 	map[x] = []
@@ -23,229 +21,75 @@ function rand(max) {
 	return Math.floor(Math.random()*(max+1))
 }
 
-function MoveWater(meshes) {
-	//iterate through water to move
-	//console.time('Move Water')
-	for (const waterUnit of meshes.children) {
-		const xPos = Number(waterUnit.position.x)
-		const yPos = Number(waterUnit.position.y)
-		const zPos = Number(waterUnit.position.z)
-
-		let goDown = 0
-		let goLeft = 0
-		let goRight = 0
-		let goFront = 0
-		let goBack = 0
-		let moveTo = []
-
-		if (map[xPos]?.[yPos-1]?.[zPos] === 'e') { // check if bottom is clear
-			goDown = 1
-		} else if (map[xPos]?.[yPos+1]?.[zPos] === 'water') { // check if water on top
-			if (map[xPos+1]?.[yPos]?.[zPos] === 'e') { // check if right is clear
-				goRight = 1
-			} else if (map[xPos-1]?.[yPos]?.[zPos] === 'e') { // check if left is clear
-				goLeft = 1
-			} else if (map[xPos]?.[yPos]?.[zPos+1] === 'e') { // check if front is clear
-				goFront = 1
-			} else if (map[xPos]?.[yPos]?.[zPos-1] === 'e') { // check if back is clear
-				goBack = 1
-			}
-		} else if (map[xPos]?.[yPos-1]?.[zPos] === 'water' || map[xPos]?.[yPos-1]?.[zPos] === 'ground') {// try to slide
-			let continueRight = true
-			let continueLeft = true
-			let continueFront = true
-			let continueBack = true
-			let positionFound = false
-			let i = 0
-			while ((continueRight || continueLeft || continueFront || continueBack) && !positionFound) {
-				++i
-				if (map[xPos+i]?.[yPos]?.[zPos] === 'e' && continueRight) {
-					if (map[xPos+i]?.[yPos-1]?.[zPos] === 'e') {
-						moveTo = [xPos+i, yPos-1, zPos]
-						positionFound = true
-					}
-				} else {
-					continueRight = false
-				}
-				if (map[xPos-i]?.[yPos]?.[zPos] === 'e' && continueLeft) {
-					if (map[xPos-i]?.[yPos-1]?.[zPos] === 'e') {
-						moveTo = [xPos-i, yPos-1, zPos]
-						positionFound = true
-					}
-				} else {
-					continueLeft = false
-				}
-				if (map[xPos]?.[yPos]?.[zPos+i] === 'e' && continueFront) {
-					if (map[xPos]?.[yPos-1]?.[zPos+i] === 'e') {
-						moveTo = [xPos, yPos-1, zPos+i]
-						positionFound = true
-					}
-				} else {
-					continueFront = false
-				}
-				if (map[xPos]?.[yPos]?.[zPos-i] === 'e' && continueBack) {
-					if (map[xPos]?.[yPos-1]?.[zPos-i] === 'e') {
-						moveTo = [xPos, yPos-1, zPos-i]
-						positionFound = true
-					}
-				} else {
-					continueBack = false
-				}
-			}
-		}
-
-
-
-
-
-		if (goDown) {
-			if (yPos - goDown < 0) // Protect from having invalid value
-				continue;
-			map[xPos][yPos][zPos] = 'e'
-			waterUnit.position.x = xPos
-			waterUnit.position.y = yPos - goDown
-			waterUnit.position.z = zPos
-			map[waterUnit.position.x][waterUnit.position.y][waterUnit.position.z] = 'water'
-		}
-		if (goLeft || goRight || goBack || goFront) {
-			if (xPos - goLeft < 0 || xPos + goRight > mapSize-1) // Protect from having invalid value
-				continue;
-			if (zPos - goBack < 0 || zPos + goFront > mapSize-1) // Protect from having invalid value
-				continue;
-				map[xPos][yPos][zPos] = 'e'
-				waterUnit.position.x = xPos + goRight - goLeft
-				waterUnit.position.y = yPos
-				waterUnit.position.z = zPos + goFront - goBack
-				map[waterUnit.position.x][waterUnit.position.y][waterUnit.position.z] = 'water'
-		}
-		
-		if (moveTo.length === 3) {
-			map[xPos][yPos][zPos] = 'e'
-			waterUnit.position.x = moveTo[0]
-			waterUnit.position.y = moveTo[1]
-			waterUnit.position.z = moveTo[2]
-			map[waterUnit.position.x][waterUnit.position.y][waterUnit.position.z] = 'water'
-		}
+function Search(pos, planeRef, meshes) {
+	map[pos[0]][pos[1]][pos[2]] = 'visited'
+	addPlane([pos[0], pos[1], pos[2]], planeRef, meshes)
+	// try to go front
+	if (map[pos[0]]?.[pos[1]]?.[pos[2]+1] === 'e') {
+		Search([pos[0], pos[1], pos[2]+1], planeRef, meshes)
 	}
-	//console.timeEnd('Move Water')
+	// try to go back
+	if (map[pos[0]]?.[pos[1]]?.[pos[2]-1] === 'e') {
+		Search([pos[0], pos[1], pos[2]-1], planeRef, meshes)
+	}
+	// try to go right
+	if (map[pos[0]+1]?.[pos[1]]?.[pos[2]] === 'e') {
+		Search([pos[0]+1, pos[1], pos[2]], planeRef, meshes)
+	}
+	// try to go left
+	if (map[pos[0]-1]?.[pos[1]]?.[pos[2]] === 'e') {
+		Search([pos[0]-1, pos[1], pos[2]], planeRef, meshes)
+	}
+}
+
+function addPlane(pos, planeRef, meshes) {
+	let x = pos[0]
+	let z = pos[2]
+	let newTile = planeRef.current.clone()
+	newTile.visible = true
+	newTile.material.transparent = true
+	newTile.material.opacity = 0.5
+	newTile.position.set(x, -0.49, z)
+	meshes.current.children.push(newTile)
+	map[x][0][z] = 'visited'
 }
 
 function Waters(props) {
 	const meshes = useRef()
 	const boxTemplate = useRef()
-	const [tiles, setTiles] = useState([])
-	const { iteration, raining, waving, eruption } = props
-
-	useEffect(() => {
-		const initTiles = []
-		for (const x in map) {
-			for (const y in map[x]) {
-				for (const z in map[x][y]) {
-					if (map[x][y][z] === 'water')
-						initTiles.push({x: x, y: y, z: z})
-				}
-			}
-		}
-		setTiles(initTiles)
-	}, [])
+	const { iteration } = props
 	
-	useEffect(() => {
-		if (meshes.current) {
-			for (const water of meshes.current.children) {
-				water.material.transparent = true
-				water.material.opacity = 0.5
-			}
-		}
-	}, [meshes, tiles])
-	
+	/*
 	let timeElapsed = 0
 	useFrame((e, delta) => {
 		timeElapsed += delta
 		if (timeElapsed > 0.05) {
 			if (iteration) {
-				MoveWater(meshes.current)
-			}
-
-			if (raining) {
-				let rainingNb = 2
-				while (rainingNb--) {
-					let x = rand(mapSize-1); let y = mapSize-1; let z = rand(mapSize-1);
-					if (map[x][y][z] === 'e') {
-						let newTile = boxTemplate.current.clone()
-						newTile.visible = true
-						newTile.material.transparent = true
-						newTile.material.opacity = 0.5
-						newTile.position.set(x, y, z)
-						meshes.current.children.push(newTile)
-						map[x][y][z] = 'water'
-					}
-				}
-			}
-
-			if (waving) {
-				let x = 0
-				let y = 0
-				let z = 0
-				
-				while (y < mapSize) {
-					x = 0
-					while (x < mapSize) {
-						if (map[x][y][z] === 'e') {
-							let newTile = boxTemplate.current.clone()
-							newTile.visible = true
-							newTile.material.transparent = true
-							newTile.material.opacity = 0.5
-							newTile.position.set(x, y, z)
-							meshes.current.children.push(newTile)
-							map[x][y][z] = 'water'
-						}
-						++x
-					}
-					++y
-				}
-			}
-
-			if (eruption) {
-				let spawnPoints = [[15, 0, 12], [3, 0, 12]]
-				for (const p of spawnPoints) {
-					while (1) {
-						if (map[p[0]]?.[p[1]]?.[p[2]] === 'water' || map[p[0]]?.[p[1]]?.[p[2]] === 'ground') {
-							p[1]++
-						} else if (map[p[0]]?.[p[1]]?.[p[2]] === 'e') {
-							let newTile = boxTemplate.current.clone()
-							newTile.visible = true
-							newTile.material.transparent = true
-							newTile.material.opacity = 0.5
-							newTile.position.set(p[0], p[1], p[2])
-							meshes.current.children.push(newTile)
-							map[p[0]][p[1]][p[2]] = 'water'
-							break;
-						} else {
-							break;
-						}
-					}
-				}
+				// move water
 			}
 
 			timeElapsed = 0
 		}
 	})
+	*/
+
+	useEffect(() => {
+		if (iteration) {
+			Search([12, 0, 12], boxTemplate, meshes)
+		}
+	}, [iteration])
 
 	return (<>
-		<mesh ref={boxTemplate} position={[0, 0, 0]} visible={false}>
-			<boxBufferGeometry attach="geometry" args={[1, 1, 1]} />
-			<meshStandardMaterial attach="material" color="#409EFF" />
+		<mesh ref={boxTemplate} rotation={[4.71239, 0, 0]} visible={false}>
+			<planeBufferGeometry attach="geometry" args={[1, 1]} />
+			<meshStandardMaterial attach="material" color="#67C23A" />
 		</mesh>
 		<mesh ref={meshes}>
-			{Object.keys(tiles).map((k, i) => (
-				<mesh
-					position={[tiles[k].x, tiles[k].y, tiles[k].z]}
-					key={i}
-				>
-					<boxBufferGeometry attach="geometry" args={[1, 1, 1]} />
-					<meshStandardMaterial attach="material" color="#409EFF" />
-				</mesh>
-			))}
+			
+		</mesh>
+		<mesh position={[12, 0, 12]}>
+			<boxBufferGeometry attach="geometry" args={[1, 1, 1]} />
+			<meshStandardMaterial attach="material" color="yellow" />
 		</mesh>
 	</>)
 }
@@ -274,7 +118,7 @@ function Grounds(props) {
 				key={i}
 				>
 					<boxBufferGeometry attach="geometry" args={[1, 1, 1]} />
-					<meshStandardMaterial attach="material" color="#67C23A"/>
+					<meshStandardMaterial attach="material" color="#F56C6C"/>
 				</mesh>
 			))}
 		</mesh>
@@ -291,19 +135,6 @@ function Plane() {
 	</>)
 }
 
-function SimulationLimit() {
-	const geom = useMemo(() => new THREE.PlaneBufferGeometry(mapSize, mapSize))
-	return (<>
-		<mesh rotation={[0, 0, 0]} position={[mapSize/2-0.5, mapSize/2-0.5, -0.49]}>
-			<lineSegments>
-				<edgesGeometry attach="geometry" args={[geom]} />
-				<lineBasicMaterial color="#f00" attach="material" />
-			</lineSegments>
-		</mesh>
-		
-	</>)
-}
-
 export default function Mod1() {
 	const [iteration, setIteration] = useState(false)
 	const [raining, setRaining] = useState(0)
@@ -313,65 +144,7 @@ export default function Mod1() {
 	const [totalGround, setTotalGround] = useState(0)
 	
 	useEffect(() => {
-		
-		
-		
-
 		/*
-		// fill with grounds
-		let expectedGround = (mapSize*mapSize)
-		while (expectedGround-- > 0) {
-			const x = rand(mapSize-1)
-			const y = rand(mapSize-1)
-			const z = rand(mapSize-1)
-			if (y < mapSize - mapSize/2)
-				map[x][y][z] = 'ground'
-		}
-		*/
-
-		// fill with water
-		/*
-		let expectedWater = (mapSize*mapSize)*5
-		while (expectedWater-- > 0) {
-			const x = rand(mapSize-1)
-			const y = rand(mapSize-1)
-			const z = rand(mapSize-1)
-			if (y > mapSize - mapSize/4)
-				map[x][y][z] = 'water'
-		}
-		*/
-
-		/*
-		// wave
-		let x1 = 0
-		let y1 = 0
-		let z1 = 0
-		while (x1 < mapSize/4) {
-			y1 = 0
-			while (y1 < mapSize) {
-				z1 = 0
-				while (z1 < mapSize) {
-					map[x1][y1][z1] = 'water'
-					++z1
-				}
-				++y1
-			}
-			++x1
-		}
-		*/
-
-		/*
-		// fill synlo map
-		for (const x in slopezMap) {
-			for (const y in slopezMap[x]) {
-				for (const z in slopezMap[x][y]) {
-					if (slopezMap[x][y][z] === 1)
-						if (x < mapSize && y < mapSize && z < mapSize)
-							map[x][z][y] = 'ground'
-				}
-			}
-		}
-		*/
 		let copyMap = JSON.parse(JSON.stringify(map))
 		copyMap[0][0][0] = 'ground'
 		copyMap[0][2][0] = 'ground'
@@ -390,6 +163,15 @@ export default function Mod1() {
 			}
 		}
 		console.log('testing', map2)
+		*/
+
+		
+		let expectedGround = (mapSize*mapSize)/2
+		while (expectedGround-- > 0) {
+			map[rand(mapSize-1)][0][rand(mapSize-1)] = 'ground'
+		}
+		
+		map[12][0][12] = 'e'
 
 		// count tiles
 		let water = 0
@@ -421,7 +203,9 @@ export default function Mod1() {
 			<p style={{color: '#67C23A', position: 'absolute', zIndex: 10000, right: 5, marginTop: 20, fontSize: 17}}>{totalGround}</p>
 			<Canvas colorManagement>
 				<pointLight intensity={0.45} distance={mapSize*2} color="#fff" position={[Math.floor(mapSize/2), mapSize+5, Math.floor(mapSize/2)]}/>
+				{
 				<pointLight intensity={0.45} distance={mapSize*2} color="#fff" position={[Math.floor(mapSize/2), Math.floor(mapSize/2), Math.floor(mapSize/2)]}/>
+				}
 				
 				<Waters iteration={iteration} raining={raining} waving={waving} eruption={eruption}/>
 				<Grounds/>
@@ -430,10 +214,8 @@ export default function Mod1() {
 				
 
 				<Plane />
-				<SimulationLimit />
 
 				<gridHelper args={[mapSize, mapSize, `white`, `#409EFF`]} position={[mapSize/2-0.5, -0.5, mapSize/2-0.5]}/>
-				<gridHelper args={[mapSize, mapSize, `white`, `#67C23A`]} rotation={[1.5708, 0, 0]} position={[mapSize/2-0.5, mapSize/2-0.5, -0.5]}/>
 				<Stars />
 
 				<TrackballControls />
